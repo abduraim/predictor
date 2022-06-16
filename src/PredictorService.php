@@ -4,9 +4,13 @@ namespace Abduraim\Predictor;
 
 use Abduraim\Predictor\Interfaces\Neuronable;
 use Abduraim\Predictor\Interfaces\PredictorInterface;
+use Abduraim\Predictor\Models\Neuron;
 use Abduraim\Predictor\Models\NeuronCluster;
+use Abduraim\Predictor\Models\NeuronClusterConnection;
+use App\Models\Gender;
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 
@@ -43,7 +47,7 @@ class PredictorService implements PredictorInterface
 
         return $models->values();
     }
-    
+
     public function syncNeuronableModels(): void
     {
         $neuronClusters = NeuronCluster::all()->pluck('neuronable_type');
@@ -54,5 +58,73 @@ class PredictorService implements PredictorInterface
                 $neuronCluster->save();
             }
         }
+    }
+
+    public function syncNeurons(): void
+    {
+        foreach ($this->getNeuronableModels() as $neuronableModel) {
+            // remove excess neurons
+            Neuron::query()->whereDoesntHaveMorph('neuronable', $neuronableModel)->delete();
+            // create missing neurons
+            $neuronableModel::query()
+                ->doesntHave('neuron')
+                ->each(function (Neuronable $model) {
+                    $model->neuron()->create(['options' => ['fdsa', 'rewq', 'vcxz']]);
+                });
+        }
+
+    }
+
+    public function syncNeuronConnections(): void
+    {
+
+
+//        $t[0] = collect([1,2,3]);
+//        $t[1] = collect([4,5]);
+//        $t[2] = collect([6,7,8]);
+//
+//        $result = $t[0];
+//        array_shift($t);
+//        $result = $result->crossJoin(...$t);
+//
+//        dd($result);
+
+
+
+        NeuronClusterConnection::each(function (NeuronClusterConnection $item) {
+
+            $collections = [];
+            collect($item->clusters)->each(function ($model) use (&$collections) {
+                $collections[] = $this->getLazyCollection($model);
+            });
+
+            $result = [];
+            foreach ($collections as $collection) {
+
+            }
+
+
+            dd($collections);
+            $model::cursor()->each(function ($item) {
+                dd($item);
+            });
+
+            $model::query()->each(function ($item) {
+                dd($item->id);
+            });
+
+            $result = [];
+
+
+            foreach ($item->clusters as $model) {
+                $result[] = $model::query()->pluck('id');
+            }
+            dd($result);
+        });
+    }
+
+    private function getLazyCollection($model)
+    {
+        return $model::cursor();
     }
 }
