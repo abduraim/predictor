@@ -13,6 +13,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\LazyCollection;
 
 class PredictorService implements PredictorInterface
 {
@@ -90,16 +91,43 @@ class PredictorService implements PredictorInterface
 //        dd($result);
 
 
-
         NeuronClusterConnection::each(function (NeuronClusterConnection $item) {
 
-            $collections = [];
+            $collections = new Collection();
             collect($item->clusters)->each(function ($model) use (&$collections) {
-                $collections[] = $this->getLazyCollection($model);
+                $collections->push($model::cursor()->map(function ($item) {
+                    return $item;
+                }));
             });
 
+
             $result = [];
+            $collections->each(function (LazyCollection $collection) use ($result) {
+                $collection->each(function ($item) use ($result) {
+                    $result[] = $item;
+                });
+                dd($result);
+            });
+
+            dd($this->test($collections, $result));
+
             foreach ($collections as $collection) {
+                $currentCollection = array_shift($collections);
+                /** @var LazyCollection $currentCollection */
+                foreach ($currentCollection as $item) {
+                    if (count($collections)) {
+                        $nextCurrentCollection = array_shift($collections);
+                        foreach ($nextCurrentCollection as $neItem) {
+                            if (count($collections)) {
+
+                            } else {
+                                dd($item, $neItem);
+                            }
+                        }
+                    }
+                }
+                dd($collections);
+
 
             }
 
@@ -123,8 +151,26 @@ class PredictorService implements PredictorInterface
         });
     }
 
-    private function getLazyCollection($model)
+
+    private function test(array $collections, &$result)
     {
-        return $model::cursor();
+        if (count($collections)) {
+            $currentCollection = array_shift($collections);
+            foreach ($currentCollection as $item) {
+                $result[] = $item;
+                $this->test($collections, $result);
+            }
+        } else {
+            return $result;
+        }
     }
 }
+
+//foreach ($collections as $collection) {
+//    $currentCollection = array_shift($collections);
+//    /** @var LazyCollection $currentCollection */
+//    foreach ($currentCollection as $item) {
+//        if (count($collections)) {
+//            $nextCurrentCollection = array_shift($collections);
+//        }
+//    }
