@@ -8,31 +8,15 @@ interface PredictorInterface
 {
     /**
      * Предсказать
+     * 
      * @return mixed
      */
     public function predict();
 
     /**
-     * Collection of Neuronable model names
-     * @return Collection
-     */
-    public function getNeuronableModels(): Collection;
-
-    /**
-     * Sync Neuronable Models with their Clusters
+     * Синхронизация нейронных кластеров, нейронов и их связей в приложении и БД
+     * 
      * @return void
      */
-    public function syncNeuronableModels(): void;
-
-    /**
-     * Sync neurons with their models
-     * @return void
-     */
-    public function syncNeurons(): void;
-
-    /**
-     * Sync Neuron connections by Cluster connections
-     * @return void
-     */
-    public function syncNeuronConnections(): void;
+    public function sync(): void;
 }

@@ -4,26 +4,146 @@ namespace Abduraim\Predictor;
 
 use Abduraim\Predictor\Interfaces\Neuronable;
 use Abduraim\Predictor\Interfaces\PredictorInterface;
+use Abduraim\Predictor\Models\Collections\NeuronableCollection;
 use Abduraim\Predictor\Models\Neuron;
 use Abduraim\Predictor\Models\NeuronCluster;
 use Abduraim\Predictor\Models\NeuronClusterConnection;
+use Abduraim\Predictor\Models\NeuronConnection;
 use App\Models\Gender;
 use Illuminate\Container\Container;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\LazyCollection;
 
 class PredictorService implements PredictorInterface
 {
-
     public function predict()
     {
         return ['qwer', 'asdf', 'zxcv'];
     }
 
-    public function getNeuronableModels(): Collection
+    public function sync(): void
+    {
+        DB::transaction(function () {
+            // Существующие файлы neuronable-классов
+            $fileNeuronableClassesCollection = $this->getInitedNeuronableClassesCollection();
+
+            // Существующие записи в БД о neuronable-классах
+            $dbNeuronableClassesCollection = NeuronCluster::query()->pluck('neuronable_type');
+
+            // Все neuronable-классы
+            $commonClassesCollection = $fileNeuronableClassesCollection->merge($dbNeuronableClassesCollection)->unique();
+
+            // Обработка
+            foreach ($commonClassesCollection as $neuronableModel) {
+                // Если такого кластера в БД нет
+                if (!$dbNeuronableClassesCollection->contains($neuronableModel)) {
+                    // Создаем запись о кластере
+                    NeuronCluster::query()->create([
+                        'neuronable_type' => $neuronableModel,
+                        'title' => $neuronableModel,
+                    ]);
+
+                    // Синхронизируем нейроны такого класса
+
+                    // Нейроны несуществующих сущностей
+                    $missingNeuronsQuery = Neuron::query()->whereDoesntHaveMorph('neuronable', $neuronableModel);
+
+                    // Удаем связи нейронов несуществующих сущностей
+                    $this->removeNeuronConnections($missingNeuronsQuery->pluck('id')->toArray());
+
+                    // Удаляем нейроны несуществующих сущностей
+                    $missingNeuronsQuery->delete();
+
+                    // Создаем отсутствующие нейроны
+                    $neuronableModel::query()
+                        ->doesntHave('neuron')
+                        ->each(function (Neuronable $model) {
+                            $model->neuron()->create(['options' => []]);
+                        });
+                }
+
+                // Если такого кластера нет среди файлов
+                if (!$fileNeuronableClassesCollection->contains($neuronableModel)) {
+                    // Удаляем записи о связях этого класера
+                    NeuronClusterConnection::query()
+                        ->whereHasCluster($neuronableModel)
+                        ->delete();
+
+                    // Удаляем запись о кластере
+                    NeuronCluster::query()
+                        ->whereNeuronableType($neuronableModel)
+                        ->delete();
+
+                    // Нейроны несуществующего класса
+                    $removedNeuronsQuery = Neuron::query()->whereNeuronableType($neuronableModel);
+
+                    // Удаляем связи нейронов
+                    $this->removeNeuronConnections($removedNeuronsQuery->pluck('id')->toArray());
+
+                    // Удаляем нейроны
+                    $removedNeuronsQuery->delete();
+                }
+            }
+        });
+    }
+
+
+    /**
+     * Создание связи нейронов
+     *
+     * @param Neuronable[] $neuronables Массив neuronable-объектов
+     * @param bool $status Статус
+     * @param int $weight Вес связи
+     * @return NeuronConnection
+     */
+    public function makeNeuronConnection(
+        NeuronableCollection $neuronableCollection,
+        bool $status = true,
+        int $weight = 1
+    ): NeuronConnection {
+        return NeuronConnection::query()->create([
+            'neurons' => $neuronableCollection->getNeuronIds(),
+            'status' => $status,
+            'weight' => $weight
+        ]);
+    }
+
+    /**
+     * Увеличение веса связи нейронов
+     *
+     * @param NeuronableCollection $neuronableCollection
+     * @return NeuronConnection
+     */
+    public function touchNeuronConnection(NeuronableCollection $neuronableCollection): NeuronConnection
+    {
+        $neuronConnection = NeuronConnection::query()
+            ->whereNeuronIds($neuronableCollection->getNeuronIds())
+            ->first();
+
+        // Изменение веса
+        $neuronConnection->increment('weight');
+
+        return $neuronConnection;
+    }
+
+
+
+    public function getVariants(NeuronableCollection $neuronableCollection)
+    {
+        dd('asdf');
+    }
+
+
+    /**
+     * Возвращает коллекцию определнных neuronable-классов существующих в приложении
+     *
+     * @return Collection<Neuronable>
+     */
+    private function getInitedNeuronableClassesCollection(): Collection
     {
         $models = collect(File::allFiles(app_path()))
             ->map(function ($item) {
@@ -49,128 +169,17 @@ class PredictorService implements PredictorInterface
         return $models->values();
     }
 
-    public function syncNeuronableModels(): void
+    /**
+     * Удаление записей о связях нейронов
+     *
+     * @param array $neuronIds Массив id'шек нейронов, связи которых необходим удалить
+     */
+    private function removeNeuronConnections(array $neuronIds): void
     {
-        $neuronClusters = NeuronCluster::all()->pluck('neuronable_type');
-        foreach ($this->getNeuronableModels() as $neuronableModel) {
-            if (!$neuronClusters->contains($neuronableModel)) {
-                $neuronCluster = new NeuronCluster();
-                $neuronCluster->neuronable_type = $neuronCluster->title = $neuronableModel;
-                $neuronCluster->save();
-            }
-        }
-    }
-
-    public function syncNeurons(): void
-    {
-        foreach ($this->getNeuronableModels() as $neuronableModel) {
-            // remove excess neurons
-            Neuron::query()->whereDoesntHaveMorph('neuronable', $neuronableModel)->delete();
-            // create missing neurons
-            $neuronableModel::query()
-                ->doesntHave('neuron')
-                ->each(function (Neuronable $model) {
-                    $model->neuron()->create(['options' => ['fdsa', 'rewq', 'vcxz']]);
-                });
-        }
-
-    }
-
-    public function syncNeuronConnections(): void
-    {
-
-
-//        $t[0] = collect([1,2,3]);
-//        $t[1] = collect([4,5]);
-//        $t[2] = collect([6,7,8]);
-//
-//        $result = $t[0];
-//        array_shift($t);
-//        $result = $result->crossJoin(...$t);
-//
-//        dd($result);
-
-
-        NeuronClusterConnection::each(function (NeuronClusterConnection $item) {
-
-            $collections = new Collection();
-            collect($item->clusters)->each(function ($model) use (&$collections) {
-                $collections->push($model::cursor()->map(function ($item) {
-                    return $item;
-                }));
-            });
-
-
-            $result = [];
-            $collections->each(function (LazyCollection $collection) use ($result) {
-                $collection->each(function ($item) use ($result) {
-                    $result[] = $item;
-                });
-                dd($result);
-            });
-
-            dd($this->test($collections, $result));
-
-            foreach ($collections as $collection) {
-                $currentCollection = array_shift($collections);
-                /** @var LazyCollection $currentCollection */
-                foreach ($currentCollection as $item) {
-                    if (count($collections)) {
-                        $nextCurrentCollection = array_shift($collections);
-                        foreach ($nextCurrentCollection as $neItem) {
-                            if (count($collections)) {
-
-                            } else {
-                                dd($item, $neItem);
-                            }
-                        }
-                    }
-                }
-                dd($collections);
-
-
-            }
-
-
-            dd($collections);
-            $model::cursor()->each(function ($item) {
-                dd($item);
-            });
-
-            $model::query()->each(function ($item) {
-                dd($item->id);
-            });
-
-            $result = [];
-
-
-            foreach ($item->clusters as $model) {
-                $result[] = $model::query()->pluck('id');
-            }
-            dd($result);
-        });
-    }
-
-
-    private function test(array $collections, &$result)
-    {
-        if (count($collections)) {
-            $currentCollection = array_shift($collections);
-            foreach ($currentCollection as $item) {
-                $result[] = $item;
-                $this->test($collections, $result);
-            }
-        } else {
-            return $result;
+        foreach ($neuronIds as $neuronId) {
+            NeuronConnection::query()
+                ->whereJsonContains('neurons', $neuronId)
+                ->delete();
         }
     }
 }
-
-//foreach ($collections as $collection) {
-//    $currentCollection = array_shift($collections);
-//    /** @var LazyCollection $currentCollection */
-//    foreach ($currentCollection as $item) {
-//        if (count($collections)) {
-//            $nextCurrentCollection = array_shift($collections);
-//        }
-//    }
