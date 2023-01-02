@@ -90,7 +90,7 @@ class PredictorService implements PredictorInterface
             }
         });
     }
-
+    
 
     /**
      * Создание связи нейронов

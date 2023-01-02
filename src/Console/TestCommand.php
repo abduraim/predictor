@@ -9,21 +9,21 @@ use App\Models\Present;
 use Illuminate\Console\Command;
 use Illuminate\Support\Str;
 
-class InstallCommand extends Command
+class TestCommand extends Command
 {
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'predictor:install';
+    protected $signature = 'predictor:test';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Install all of the Predictor resources';
+    protected $description = 'Test';
 
     /**
      * Execute the console command.
@@ -32,14 +32,6 @@ class InstallCommand extends Command
      */
     public function handle()
     {
-        $this->comment('Publishing Predictor Service Provider...');
-        $this->callSilent('vendor:publish', ['--tag' => 'predictor-provider']);
-
-        $this->comment('Publishing Predictor Configuration...');
-        $this->callSilent('vendor:publish', ['--tag' => 'predictor-config']);
-
-        $this->info('Predictore scaffolding installed successfully.');
-        
         
         
 
