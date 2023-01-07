@@ -4,8 +4,7 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
-return new class extends Migration
-{
+return new class extends Migration {
     /**
      * The database schema.
      *
@@ -48,16 +47,6 @@ return new class extends Migration
             $table->timestamps();
         });
 
-        $this->schema->create('neuron_connections', function (Blueprint $table) {
-            $table->id();
-            $table->json('neurons')->comment('Массив нейронов');
-            // Todo: mysql 5.7.8
-            //            $table->unique('neurons');
-            $table->boolean('status')->comment('Статус');
-            $table->unsignedBigInteger('weight')->comment('Вес связи');
-            $table->timestamps();
-        });
-        
         $this->schema->create('neuron_clusters', function (Blueprint $table) {
             $table->id();
             $table->string('neuronable_type');
@@ -72,6 +61,23 @@ return new class extends Migration
             // Todo: need mysql 5.7.8 version minimum
 //            $table->unique('clusters');
             $table->boolean('status')->default(false);
+            $table->unsignedBigInteger('weight')->comment('Вес связи');
+            $table->timestamps();
+        });
+
+        $this->schema->create('neuron_connections', function (Blueprint $table) {
+            $table->id();
+            $table->unsignedBigInteger('neuron_cluster_connection_id');
+            $table->foreign('neuron_cluster_connection_id')
+                ->references('id')
+                ->on('neuron_cluster_connections')
+                ->onUpdate('cascade')
+                ->onDelete('cascade');
+            $table->json('neurons')->comment('Массив нейронов');
+            // Todo: mysql 5.7.8
+            //            $table->unique('neurons');
+            $table->boolean('status')->comment('Статус');
+            $table->unsignedBigInteger('weight')->comment('Вес связи');
             $table->timestamps();
         });
     }

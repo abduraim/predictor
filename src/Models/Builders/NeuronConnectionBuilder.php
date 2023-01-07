@@ -6,6 +6,14 @@ use Abduraim\Predictor\Interfaces\Neuronable;
 use Abduraim\Predictor\Models\Neuron;
 use Illuminate\Database\Eloquent\Builder;
 
+/**
+ * Builder связей неронов
+ *
+ * @method static NeuronConnectionBuilder enabled() Включенные связи
+ * @method static NeuronConnectionBuilder checked() Проверенные связи
+ * @method static NeuronConnectionBuilder actual() Рабочие связи (включенные и проверенные)
+ *
+ */
 class NeuronConnectionBuilder extends Builder
 {
     /**
@@ -31,4 +39,6 @@ class NeuronConnectionBuilder extends Builder
             ->whereJsonLength('neurons', '=', count($neuronIds))
             ->whereJsonContains('neurons', $neuronIds);
     }
+
+
 }

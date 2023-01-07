@@ -3,6 +3,8 @@
 namespace Abduraim\Predictor;
 
 use Abduraim\Predictor\Console\InstallCommand;
+use Abduraim\Predictor\Console\MakeNeuonClusterConnectionCommand;
+use Abduraim\Predictor\Console\SyncCommand;
 use Abduraim\Predictor\Console\TestCommand;
 use Closure;
 use Illuminate\Support\ServiceProvider;
@@ -26,6 +28,8 @@ class PredictorServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 InstallCommand::class,
+                SyncCommand::class,
+                MakeNeuonClusterConnectionCommand::class,
                 TestCommand::class,
             ]);
         }

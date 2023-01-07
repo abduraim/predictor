@@ -9,10 +9,16 @@ use Abduraim\Predictor\Models\Neuron;
 use Abduraim\Predictor\Models\NeuronCluster;
 use Abduraim\Predictor\Models\NeuronClusterConnection;
 use Abduraim\Predictor\Models\NeuronConnection;
+use Abduraim\Predictor\Repositories\NeuronClusterConnectionRepository;
+use Abduraim\Predictor\Repositories\NeuronRepository;
+use Abduraim\Predictor\Services\HelperService;
 use App\Models\Gender;
 use Illuminate\Container\Container;
+use Illuminate\Database\ClassMorphViolationException;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Benchmark;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -20,8 +26,67 @@ use Illuminate\Support\LazyCollection;
 
 class PredictorService implements PredictorInterface
 {
-    public function predict()
+    public function predict(int $predictableNeuronClusterId, array $payload)
     {
+//        $predictableNeuronIds = NeuronCluster::query()
+//            ->findOrFail($predictableNeuronClusterId)
+//            ->neurons()
+//            ->pluck('id');
+
+        $result = [];
+
+        foreach ($payload as $item) {
+
+            /** @var NeuronCluster $neuronCluster */
+            $neuronCluster = NeuronCluster::query()->findOrFail($item['neuron_cluster_id']);
+
+            /** @var Neuron $neuron */
+            $neuron = Neuron::query()->findOrFail($item['neuron_id']);
+
+            if ($neuronCluster->neurons->doesntContain($neuron)) {
+                throw new \Exception('Нейрон не принадлежит данному кластеру');
+            }
+
+            // Собираем данные о весах и кол-ве
+            /** @var NeuronClusterConnection $neuronClusterConnection */
+            $neuronClusterConnection = NeuronClusterConnection::query()
+                ->whereJsonContains('clusters', [$predictableNeuronClusterId, $neuronCluster->getKey()])
+                ->first()
+                ->neuron_connections()
+//                ->actual()
+                ->enabled()
+                ->whereJsonContains('neurons', [$neuron->getKey()])
+                ->each(function (NeuronConnection $neuronConnection) use ($predictableNeuronIds, &$result, $neuron) {
+                    $predictableNeuronId = $neuronConnection->getOppositeNeuronId($neuron->getKey());
+                    
+                    if (!isset($result[$predictableNeuronId])) {
+                        $result[$predictableNeuronId] = [
+                            'count' => 0,
+                            'weight' => 0,
+                        ];
+                    }
+                    
+                    $result[$predictableNeuronId]['count'] ++;
+                    $result[$predictableNeuronId]['weight'] += $neuronConnection->weight;
+                });
+        }
+
+        // Сортируем
+        $sortedCollection = collect($result)
+            ->sortBy([
+                ['count', 'desc'],
+                ['weight', 'desc']
+            ]);
+        
+        return $sortedCollection->keys()->splice(0, 50);
+
+
+        dd($neuronCluster, $neuron);
+
+//            dd(NeuronConnection::query()->whereHasNeuron())
+        dd($item);
+        
+        
         return ['qwer', 'asdf', 'zxcv'];
     }
 
@@ -39,8 +104,12 @@ class PredictorService implements PredictorInterface
 
             // Обработка
             foreach ($commonClassesCollection as $neuronableModel) {
+
+                $originClassName = Relation::getMorphedModel($neuronableModel) ?: $neuronableModel;
+
                 // Если такого кластера в БД нет
-                if (!$dbNeuronableClassesCollection->contains($neuronableModel)) {
+                if ($dbNeuronableClassesCollection->doesntContain($neuronableModel)) {
+
                     // Создаем запись о кластере
                     NeuronCluster::query()->create([
                         'neuronable_type' => $neuronableModel,
@@ -59,15 +128,16 @@ class PredictorService implements PredictorInterface
                     $missingNeuronsQuery->delete();
 
                     // Создаем отсутствующие нейроны
-                    $neuronableModel::query()
+                    $originClassName::query()
                         ->doesntHave('neuron')
                         ->each(function (Neuronable $model) {
-                            $model->neuron()->create(['options' => []]);
+                            (new NeuronRepository())->store($model);
                         });
+
                 }
 
                 // Если такого кластера нет среди файлов
-                if (!$fileNeuronableClassesCollection->contains($neuronableModel)) {
+                if ($fileNeuronableClassesCollection->doesntContain($neuronableModel)) {
                     // Удаляем записи о связях этого класера
                     NeuronClusterConnection::query()
                         ->whereHasCluster($neuronableModel)
@@ -88,29 +158,18 @@ class PredictorService implements PredictorInterface
                     $removedNeuronsQuery->delete();
                 }
             }
+
+            ini_set('memory_limit', '512M');
+
+            // Синхронизация связей кластеров нейронов
+            NeuronClusterConnection::query()
+                ->cursor()
+                ->each(function (NeuronClusterConnection $neuronClusterConnection) {
+                    (new NeuronClusterConnectionRepository())->syncNeuronConnections($neuronClusterConnection);
+                });
         });
     }
-    
 
-    /**
-     * Создание связи нейронов
-     *
-     * @param Neuronable[] $neuronables Массив neuronable-объектов
-     * @param bool $status Статус
-     * @param int $weight Вес связи
-     * @return NeuronConnection
-     */
-    public function makeNeuronConnection(
-        NeuronableCollection $neuronableCollection,
-        bool $status = true,
-        int $weight = 1
-    ): NeuronConnection {
-        return NeuronConnection::query()->create([
-            'neurons' => $neuronableCollection->getNeuronIds(),
-            'status' => $status,
-            'weight' => $weight
-        ]);
-    }
 
     /**
      * Увеличение веса связи нейронов
@@ -131,7 +190,6 @@ class PredictorService implements PredictorInterface
     }
 
 
-
     public function getVariants(NeuronableCollection $neuronableCollection)
     {
         dd('asdf');
@@ -145,7 +203,7 @@ class PredictorService implements PredictorInterface
      */
     private function getInitedNeuronableClassesCollection(): Collection
     {
-        $models = collect(File::allFiles(app_path()))
+        return collect(File::allFiles(app_path()))
             ->map(function ($item) {
                 $path = $item->getRelativePathName();
                 $class = sprintf('%s%s',
@@ -164,9 +222,29 @@ class PredictorService implements PredictorInterface
                 }
 
                 return $valid;
+            })
+            ->map(function ($model) {
+                return HelperService::getPolymorphClassAliasIfExist($model);
             });
+    }
 
-        return $models->values();
+    /**
+     * Замена названий классов, полиморфными алиасами
+     *
+     * @param string $alias Алиас
+     * @param string $model Модель
+     * @return void
+     */
+    private function replaceToPolymorphAlias(string $alias, string $model)
+    {
+        // Устанавливаем алиас, вместо модели, если такие записи есть
+        Neuron::query()
+            ->where('neuronable_type', $model)
+            ->update(['neuronable_type' => $alias]);
+
+        NeuronCluster::query()
+            ->where('neuronable_type', $model)
+            ->update(['neuronable_type' => $alias]);
     }
 
     /**

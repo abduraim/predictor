@@ -8,10 +8,12 @@ interface PredictorInterface
 {
     /**
      * Предсказать
-     * 
+     *
+     * @param int $predictableNeuronClusterId Предсказываемый кластер нейронов
+     * @param array $payload Выбранные варианты
      * @return mixed
      */
-    public function predict();
+    public function predict(int $predictableNeuronClusterId, array $payload);
 
     /**
      * Синхронизация нейронных кластеров, нейронов и их связей в приложении и БД
