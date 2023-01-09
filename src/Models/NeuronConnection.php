@@ -5,14 +5,20 @@ namespace Abduraim\Predictor\Models;
 use Abduraim\Predictor\Models\Builders\NeuronConnectionBuilder;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 /**
  * @property Model $neuronable Сущность
  *
- * @property array|int[] $neurons Массив id'шек нейронов
+ * @property int $determinant_neuron_id Id нейроноа определителя
+ * @property int $target_neuron_id Id нейроноа определяемого
  * @property bool $status Статус
  * @property int $weight Вес
- * 
+ *
+ * @property NeuronClusterConnection $neuronClusterConnection Связь кластеров нейронов
+ * @property Neuron $determinantNeuron Нейрон определитель
+ * @property Neuron $targetNeuron Нейрон определяемый
+ *
  * @method static NeuronConnectionBuilder query()
  *
  */
@@ -22,14 +28,14 @@ class NeuronConnection extends Model
 
     protected $fillable = [
         'neuron_cluster_connection_id',
-        'neurons',
+        'determinant_neuron_id',
+        'target_neuron_id',
         'status',
         'weight',
         'updated_at',
     ];
 
     protected $casts = [
-        'neurons' => 'array',
         'status' => 'boolean',
     ];
     
@@ -39,19 +45,36 @@ class NeuronConnection extends Model
     }
 
     /**
-     * Возвращает Id связанного нейрона
+     * Связь кластеров нейронов данной связи нейронов
      *
-     * @param string $neuronId Исходный нейрон
-     * @return string
+     * @return \Illuminate\Database\Eloquent\Relations\BelongsTo
      */
-    public function getOppositeNeuronId(string $neuronId): string
+    public function neuronClusterConnection(): BelongsTo
     {
-        return collect($this->neurons)
-            ->filter(function ($item) use ($neuronId) {
-                return $item !== $neuronId;
-            })
-            ->first();
+        return $this->belongsTo(NeuronClusterConnection::class,'neuron_cluster_connection_id', 'id');
     }
+
+    /**
+     * Нейрон определитель
+     *
+     * @return BelongsTo
+     */
+    public function determinantNeuron()
+    {
+        return $this->belongsTo(Neuron::class, 'determinant_neuron_id', 'id');
+    }
+
+    /**
+     * Нейрон определяемый
+     *
+     * @return BelongsTo
+     */
+    public function targetNeuron()
+    {
+        return $this->belongsTo(Neuron::class, 'target_neuron_id', 'id');
+    }
+
+
 
     /**
      * Включенные связи

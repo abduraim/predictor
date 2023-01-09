@@ -41,9 +41,5 @@ trait HasNeuron
         static::created(function(Neuronable $model) {
             (new NeuronRepository())->store($model);
         });
-
-        static::deleted(function (Neuronable $model) {
-            (new NeuronRepository())->destroy($model);
-        });
     }
 }

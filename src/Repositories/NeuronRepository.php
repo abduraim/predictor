@@ -5,6 +5,7 @@ namespace Abduraim\Predictor\Repositories;
 use Abduraim\Predictor\Exceptions\NeuronConnection\NeronConnectionDuplicateException;
 use Abduraim\Predictor\Interfaces\Neuronable;
 use Abduraim\Predictor\Models\Neuron;
+use Abduraim\Predictor\Models\NeuronCluster;
 use Abduraim\Predictor\Models\NeuronClusterConnection;
 use Abduraim\Predictor\Models\NeuronConnection;
 use Abduraim\Predictor\Services\HelperService;
@@ -29,47 +30,47 @@ class NeuronRepository
             // Определяем название класса
             $class = HelperService::getPolymorphClassAliasIfExist(get_class($model));
 
-            // Проходим по всем связям кластеров нейронов
-            NeuronClusterConnection::query()
-                ->whereJsonContains('clusters', $class)
-                ->get()
-                ->each(function (NeuronClusterConnection $neuronClusterConnection) use ($class, $neuron) {
+            // Определяем кластер
+            /** @var NeuronCluster $neuronCluster */
+            $neuronCluster = NeuronCluster::query()
+                ->where('neuronable_type', $class)
+                ->first();
 
-                    // И создаем связи нейронов для нового нейрона
-                    Neuron::query()
-                        ->where('neuronable_type', $neuronClusterConnection->getOppositeCluster($class))
-                        ->pluck('id')
-                        ->crossJoin($neuron->getKey())
-                        ->each(function ($neuronIds) use ($neuronClusterConnection) {
-                            try {
-                                (new NeuronConnectionRepository())->store($neuronClusterConnection, $neuronIds);
-                            } catch (NeronConnectionDuplicateException $exception) {
-                                // do nothing
-                            }
-                        });
-                });
-        });
+            // Создаем связи нейронов
+            if ($neuronCluster) {
 
-    }
+                $neuronCluster
+                    ->targetableNeuronClusterConnections
+                    ->each(function (NeuronClusterConnection $neuronClusterConnection) use ($neuron) {
+                        $neuronClusterConnection
+                            ->determinantNeuronCluster
+                            ->neurons
+                            ->each(function (Neuron $determinantNeuron) use ($neuronClusterConnection, $neuron) {
+                                try {
+                                    (new NeuronConnectionRepository())->store($neuronClusterConnection, $determinantNeuron, $neuron);
+                                } catch (NeronConnectionDuplicateException $exception) {
+                                    // do nothing
+                                }
+                            });
+                    });
 
-    /**
-     * Удаление нейрона
-     *
-     * @param Neuronable $model
-     * @return void
-     */
-    public function destroy(Neuronable $model)
-    {
-        DB::transaction(function () use ($model) {
-            $neuron = $model->neuron;
+                $neuronCluster
+                    ->determinatableNeuronClusterConnections
+                    ->each(function (NeuronClusterConnection $neuronClusterConnection) use ($neuron) {
+                        $neuronClusterConnection
+                            ->targetNeuronCluster
+                            ->neurons
+                            ->each(function (Neuron $targetNeuron) use ($neuronClusterConnection, $neuron) {
+                                try {
+                                    (new NeuronConnectionRepository())
+                                        ->store($neuronClusterConnection, $neuron, $targetNeuron);
+                                } catch (NeronConnectionDuplicateException $exception) {
+                                    // do nothing
+                                }
+                            });
+                    });
+            }
 
-            // Удаляем связи нейронов
-            NeuronConnection::query()
-                ->whereJsonContains('neurons', $neuron->getKey())
-                ->delete();
-
-            // Удаляем нейрон
-            $neuron->delete();
         });
 
     }

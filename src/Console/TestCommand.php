@@ -4,6 +4,7 @@ namespace Abduraim\Predictor\Console;
 
 use Abduraim\Predictor\Models\Collections\NeuronableCollection;
 use Abduraim\Predictor\Models\Neuron;
+use Abduraim\Predictor\Models\NeuronCluster;
 use Abduraim\Predictor\Models\NeuronClusterConnection;
 use Abduraim\Predictor\Models\NeuronConnection;
 use Abduraim\Predictor\PredictorService;
@@ -45,9 +46,6 @@ class TestCommand extends Command
      */
     public function handle(PredictorService $predictorService)
     {
-
-
-
 //        $count = 7;
 //        $class = Weekday::class;
 //        $alias = HelperService::getPolymorphClassAliasIfExist($class);
@@ -62,6 +60,15 @@ class TestCommand extends Command
 //        $bar->finish();
 //        dd('end');
 
+//        $determinantNeuronCluster = NeuronCluster::find(2);
+//        $targetNeuronCluster = NeuronCluster::find(6);
+//        (new NeuronClusterConnectionRepository())->store($determinantNeuronCluster, $targetNeuronCluster);
+//
+//        dd('adsf');
+
+
+        
+        
 
 //        $present = Present::query()->create(['name' => 'Зонт']);
 //        $present = Present::query()->create(['name' => 'Автомобиль']);
@@ -82,9 +89,8 @@ class TestCommand extends Command
 //        $person = Person::query()->create(['name' => 'Дедушка']);
 //        $person = Person::query()->create(['name' => 'Брат']);
 //        $person = Person::query()->create(['name' => 'Сестра']);
-
+//
 //        dd('asdf');
-
 
 
 
@@ -93,58 +99,45 @@ class TestCommand extends Command
             [
                 [
                     'neuron_cluster_id' => 1,
-                    'neuron_id' => 10008,
-                ],
-                [
-                    'neuron_cluster_id' => 2,
                     'neuron_id' => 10012,
                 ],
                 [
+                    'neuron_cluster_id' => 2,
+                    'neuron_id' => 10023,
+                ],
+                [
                     'neuron_cluster_id' => 3,
-                    'neuron_id' => 10051,
+                    'neuron_id' => 10064,
                 ],
                 [
                     'neuron_cluster_id' => 4,
-                    'neuron_id' => 10076,
+                    'neuron_id' => 10095,
                 ],
                 [
                     'neuron_cluster_id' => 5,
-                    'neuron_id' => 10110,
+                    'neuron_id' => 10117,
                 ],
                 [
                     'neuron_cluster_id' => 7,
-                    'neuron_id' => 10119,
+                    'neuron_id' => 10128,
                 ],
             ]
         );
-
-        // Загружаем данные о результатах
-        $resultNeuronIdsString = $resultIds->implode(',');
-        Neuron::query()
-            ->whereIntegerInRaw('id', $resultIds)
-            ->orderByRaw(DB::raw("FIELD(id, {$resultNeuronIdsString})"))
-            ->with('neuronable')
-            ->each(function (Neuron $neuron) {
-                echo "[{$neuron->getKey()}] {$neuron->neuronable->name} \n";
-            });
-
-        dd();
-
-
-        dd(NeuronConnection::query()->actual()->get());
+//
+//        // Загружаем данные о результатах
+//        $resultNeuronIdsString = $resultIds->implode(',');
+//        Neuron::query()
+//            ->whereIntegerInRaw('id', $resultIds)
+//            ->orderByRaw(DB::raw("FIELD(id, {$resultNeuronIdsString})"))
+//            ->with('neuronable')
+//            ->each(function (Neuron $neuron) {
+//                echo "[{$neuron->getKey()}] {$neuron->neuronable->name} \n";
+//            });
+//
+//        dd();
 
 
-        dd('asdf');
-
-        dd();
-
-        dd('asdf');
-
-
-        (new NeuronClusterConnectionRepository())->store(Gender::class, Present::class);
-
-
-        dd('$gender');
+        
 
 
 //        $present = Present::find(1);

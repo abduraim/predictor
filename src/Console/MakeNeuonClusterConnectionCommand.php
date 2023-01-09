@@ -14,8 +14,8 @@ class MakeNeuonClusterConnectionCommand extends Command
      * @var string
      */
     protected $signature = 'predictor:make-neuron-cluster-connection 
-    {class1? : Class or morph alias} 
-    {class2? : Class or morph alias}';
+    {determinantClass? : Class or morph alias} 
+    {targetClass? : Class or morph alias}';
 
     /**
      * The console command description.
@@ -31,18 +31,18 @@ class MakeNeuonClusterConnectionCommand extends Command
      */
     public function handle()
     {
-        $class1 = $this->argument('class1') ?: $this->anticipate('Введите класс/alias первого кластера', function ($input) {
+        $determinantType = $this->argument('determinantClass') ?: $this->anticipate('Введите класс/alias кластера определителя', function ($input) {
             return NeuronCluster::query()->pluck('neuronable_type')->toArray();
         });
 
-        $class2 = $this->argument('class2') ?: $this->anticipate('Введите класс/alias второго кластера', function ($input) {
+        $targetType = $this->argument('targetClass') ?: $this->anticipate('Введите класс/alias кластера определяемого', function ($input) {
             return NeuronCluster::query()->pluck('neuronable_type')->toArray();
         });
         
-        $neuronCluster1 = NeuronCluster::query()->where('neuronable_type', $class1)->first();
-        $neuronCluster2 = NeuronCluster::query()->where('neuronable_type', $class2)->first();
+        $determinantNeuronCluster = NeuronCluster::query()->where('neuronable_type', $determinantType)->firstOrFail();
+        $targetNeuronCluster = NeuronCluster::query()->where('neuronable_type', $targetType)->firstOrFail();
         
-        (new NeuronClusterConnectionRepository())->store($neuronCluster1->getKey(), $neuronCluster2->getKey());
+        (new NeuronClusterConnectionRepository())->store($determinantNeuronCluster, $targetNeuronCluster);
 
         $this->info('Связь кластеров нейронов успешно создана');
     }

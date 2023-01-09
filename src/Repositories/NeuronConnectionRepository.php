@@ -4,6 +4,7 @@ namespace Abduraim\Predictor\Repositories;
 
 
 use Abduraim\Predictor\Exceptions\NeuronConnection\NeronConnectionDuplicateException;
+use Abduraim\Predictor\Models\Neuron;
 use Abduraim\Predictor\Models\NeuronClusterConnection;
 use Illuminate\Support\Carbon;
 
@@ -11,28 +12,25 @@ class NeuronConnectionRepository
 {
     /**
      * Создание связи нейронов
-     *
+     * 
      * @param NeuronClusterConnection $neuronClusterConnection Связь кластеров нейронов
-     * @param array $neuronIds Массив id'шек нейронов
-     * @return void
+     * @param Neuron $determinantNeuron Нейрон определитель
+     * @param Neuron $targetNeuron Определяемый нейрон
+     * @return \Illuminate\Database\Eloquent\Model
      */
-    public function store(NeuronClusterConnection $neuronClusterConnection, array $neuronIds)
+    public function store(
+        NeuronClusterConnection $neuronClusterConnection,
+        Neuron                  $determinantNeuron,
+        Neuron                  $targetNeuron
+    )
     {
-        if (
-            $neuronClusterConnection
-                ->neuron_connections()
-                ->whereJsonContains('neurons', $neuronIds)
-                ->exists()
-        ) {
-            throw new NeronConnectionDuplicateException();
-        }
-
         return $neuronClusterConnection
             ->neuron_connections()
             ->create([
-                'neurons' => $neuronIds,
-                'status' => (rand(1, 10) > 3 ? true : false),
-                'weight' => rand(1, 99),
+                'determinant_neuron_id' => $determinantNeuron->getKey(),
+                'target_neuron_id' => $targetNeuron->getKey(),
+                'status' => false,
+                'weight' => 1,
                 'updated_at' => Carbon::now(),
             ]);
     }

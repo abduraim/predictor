@@ -35,6 +35,9 @@ class InstallCommand extends Command
         $this->comment('Publishing Predictor Service Provider...');
         $this->callSilent('vendor:publish', ['--tag' => 'predictor-provider']);
 
+        $this->comment('Publishing Predictor Assets...');
+        $this->callSilent('vendor:publish', ['--tag' => 'predictor-assets']);
+
         $this->comment('Publishing Predictor Configuration...');
         $this->callSilent('vendor:publish', ['--tag' => 'predictor-config']);
 
